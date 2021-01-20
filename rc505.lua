@@ -199,7 +199,7 @@ function setup_parameters()
   params:add_separator("tracks")
   for i=1,3 do
     params:add_group("track "..i,12)
-    params:add_option(i.."sync division","effect division",divisions_available,3)
+    params:add_option(i.."sync division","sync division",divisions_available,3)
     params:set_action(i.."sync division",function(value)
       print(i.."sync division: "..divisions_available[value])
       track[i].division_sync = utils.tonumber(divisions_available[value])
