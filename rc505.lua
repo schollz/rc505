@@ -43,6 +43,9 @@ function init()
     track[i].arm_stop_play = false 
   end
 
+  -- setup parameters
+  setup_parameters()
+
   -- setup clocks for the divisions
   lattice_timing = lattice:new()
   for i,division in ipairs(divisions_available) do 
@@ -65,9 +68,6 @@ function init()
   timer.count=-1
   timer.event=refresh
   timer:start()
-
-  -- setup parameters
-  setup_parameters()
 
   --setup softcut
   reset_softcut()
