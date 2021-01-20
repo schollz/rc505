@@ -240,7 +240,7 @@ function setup_parameters()
       print(i.."effect division: "..divisions_available[value])
       track[i].division_effect = utils.tonumber(divisions_available[value])
     end)
-    params:add {type="control",id=i.."pre rec",name="pre rec",controlspec=controlspec.new(0,1.0,'lin',0.01,1.0,''),
+    params:add {type="control",id=i.."pre level",name="pre level",controlspec=controlspec.new(0,1.0,'lin',0.01,1.0,''),
       action=function(value)
         softcut.pre_level(i,value)
       end
@@ -373,7 +373,7 @@ function reset_softcut()
     softcut.rec(j+3,0)
 
     -- only main loop sets pre record feedback?
-    softcut.pre_level(j,params:get(j.."pre"))
+    softcut.pre_level(j,params:get(j.."pre level"))
     softcut.pre_level(j+3,1.0)  
   end
   softcut.poll_start_phase()
