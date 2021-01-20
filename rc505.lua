@@ -64,7 +64,14 @@ function redraw()
 
   -- draw track information
   for i=1,3 do 
-
+    Draw.track({
+      i=i,
+      selected=params:get(i.."selected")==1,
+      playing=params:get(i.."playing")==1,
+      recording=params:get(i.."recording")==1,
+      beat_repeat=params:get(i.."effect type")==1,
+      beat_shuffle=params:get(i.."effect type")==2,
+    })
   end
 
 	screen.update()
