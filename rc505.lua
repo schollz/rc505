@@ -21,20 +21,56 @@ divisions_available = {1/64,1/32,1/16,1/8,1/4,1/2,1}
 function init()
   for i=1,3 do 
     tracks[i].beat = 1 
+    tracks[i].division = 1/4
   end
 
+  -- setup clocks for the divisions
   lattice_timing = lattice:new()
   for i,division in ipairs(divisions_available) do 
     clocks[i] = lattice_timing:new_pattern{
       action = function(t)
-        clock_tick(division,t)
+        clock_tick(division,t,i)
       end,
       enabled = division==1/4 -- only enable quarter-note, fx enable others
     }
   end
+
+
+ -- initialize refresh timer
+  timer=metro.init()
+  timer.time=0.05
+  timer.count=-1
+  timer.event=refresh
+  timer:start()
+
 end
 
-function clock_tick(division,t)
+function refresh()
+
+  redraw()
+end
+
+function key(k,z)
+
+end
+
+
+function enc(k,d)
+
+end
+
+function redraw()
+	screen.clear()
+
+  -- draw track information
+  for i=1,3 do 
+
+  end
+
+	screen.update()
+end
+
+function clock_tick(division,t,clock_i)
   if division==1/4 then 
     for i=1,3 do 
       if params:get(i.."playing")==1 then 
@@ -50,30 +86,22 @@ function clock_tick(division,t)
     -- TODO update the screen
   end
   -- if division equals track division and is beat repeating, do something
+  -- -- TODO: disable division if there are not tracks needing it anymore
+  -- for i=1,3 do 
+  --   has_division = false
+  --   if tonumber(params:get(i.."effect division"))==division then 
+  --     has_division = true
+  --   end
+  --   if not has_division and division ~= 1/4 then 
+  --     clocks[clock_i]:stop()
+  --   end
+  -- end
 end
-
-function key(k,z)
-
-end
-
-
-function enc(k,d)
-
-end
-
-function redraw()
-	screen.clear()
-
-
-	screen.update()
-end
-
-
 
 function setup_parameters()
   print("setup_parameters")
   -- parameters for softcut loops
-  params:add_separator("softcut loops")
+  params:add_separator("tracks")
   for i=1,3 do
     params:add_group("track "..i,10)
     params:add {type="control",id=i.."level",name="level",controlspec=controlspec.new(0,1.0,'lin',0.01,0.5,''),
@@ -91,7 +119,7 @@ function setup_parameters()
       end
     }
     params:add {type="control",id=i.."rate",name="rate",controlspec=controlspec.new(-2,2.0,'lin',0.01,1.0,''),
-      action=function(value)
+      action=function(value)j
         print(i.."rate: "..value)
         softcut.rate(i,value)
         softcut.rate(i+3,value)
@@ -107,9 +135,46 @@ function setup_parameters()
         end
       end
     }
+    params:add_option(i.."effect type","effect type",{"repeat","shuffle"},1)
+    params:add_option(i.."effect division","effect division",divisions_available,1)
+    params:set_action(i.."effect division",function(value)
+      print(i.."effect division: "..divisions_available[value])
+      -- enable this division on the clocks
+      clocks[i]:start()
+    end)
     params:add {type="control",id=i.."pre",name="pre rec",controlspec=controlspec.new(0,1.0,'lin',0.01,1.0,''),
       action=function(value)
         softcut.pre_level(i,value)
+      end
+    }
+    params:add {type='control',id=i..'filter_frequency',name='filter cutoff',controlspec=controlspec.new(20,20000,'exp',0,20000,'Hz',100/20000),formatter=Formatters.format_freq,
+      action=function(value)
+        softcut.post_filter_fc(i,value)
+        softcut.post_filter_fc(i+3,value)
+      end
+    }
+    params:add{type='binary',name="selected",id=i..'selected',behavior='toggle',
+      action=function(value)
+        if value == 1 then 
+          print(i.."selected: "..value)
+          for j=1,3 do 
+            if i~=j then 
+              params:set(j.."selected",0)
+            end
+          end
+        end
+      end
+    }
+    params:hide(i.."selected")
+    params:add{type='binary',name="playing",id=i..'playing',behavior='toggle',
+      action=function(value)
+        print(i.."playing: "..value)
+        -- TODO: start playing on the beat if synced
+        softcut.play(i,value)
+        if value==1 then 
+          track[i].beat = 1
+          softcut.position(i,track_buffer[i].start)
+        end
       end
     }
     params:add{type='binary',name="recording",id=i..'recording',behavior='toggle',
@@ -123,26 +188,13 @@ function setup_parameters()
         end
       end
     }
-    params:add{type='binary',name="playing",id=i..'playing',behavior='toggle',
+    params:add{type='binary',name="effect",id=i..'effect',behavior='toggle',
       action=function(value)
-        print(i.."playing: "..value)
-        -- TODO: start playing on the beat if synced
-        softcut.play(i,value)
-        if value==1 then 
-          track[i].beat = 1
-          softcut.position(i,track_buffer[i].start)
-        end
-      end
-    }
-    params:add {type='control',id=i..'filter_frequency',name='filter cutoff',controlspec=controlspec.new(20,20000,'exp',0,20000,'Hz',100/20000),formatter=Formatters.format_freq,
-      action=function(value)
-        softcut.post_filter_fc(i,value)
-        softcut.post_filter_fc(i+3,value)
+        print(i.."effect: "..value)
+        -- TODO toggle effect
       end
     }
   end
-
-
 end
 
 
