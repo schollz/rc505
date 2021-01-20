@@ -12,6 +12,7 @@ clk = {}
 ti = 1 -- track selected
 shifted = false -- shift activated
 update_ui = false
+lattice_timing=nil
 
 -- constants
 track_buffer = {
@@ -379,4 +380,11 @@ function reset_softcut()
   end
   softcut.poll_start_phase()
   audio.level_adc_cut(1)
+end
+
+
+function clock.transport.start()
+  if lattice_timing ~= nil then
+    lattice_timing:hard_sync()
+  end
 end

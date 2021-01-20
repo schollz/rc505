@@ -28,10 +28,10 @@ end
 
 --- start running the lattice
 function Lattice:start()
+  self.enabled = true -- enable first so the first pulse is on time
   if self.auto and self.superclock_id == nil then
     self.superclock_id = clock.run(self.auto_pulse, self)
   end
-  self.enabled = true
 end
 
 --- stop the lattice
@@ -68,6 +68,22 @@ function Lattice.auto_pulse(s)
   end
 end 
 
+--- reset the norns clock and restart lattice
+function Lattice:hard_sync()
+  -- destroy clock, but not the patterns
+  self:stop()
+  if self.superclock_id ~= nil then 
+    clock.cancel(self.superclock_id)
+    self.superclock_id = nil 
+  end
+  for i, pattern in pairs(self.patterns) do
+    self.patterns[i].phase = 0 
+  end
+  self.transport = 0
+  params:set("clock_reset",1)
+  self:start()
+end
+
 --- advance all patterns in this lattice a single by pulse, call this manually if lattice.auto = false
 function Lattice:pulse()
   if self.enabled then
@@ -77,6 +93,8 @@ function Lattice:pulse()
         pattern.phase = pattern.phase + 1
         if pattern.phase > (pattern.division * ppm) then
           pattern.phase = pattern.phase - (pattern.division * ppm)
+        end
+         if pattern.phase == 1 then
           pattern.action(self.transport)
         end
       elseif pattern.flag then
@@ -89,7 +107,7 @@ end
 
 --- factory method to add a new pattern to this lattice
 -- @tparam[opt] table args optional named attributes are:
--- - "action" (function) called on each step of this division (lattice.transport is passed as the argument), defaults to a no-op
+-- - "action" (function) function called on each step of this division
 -- - "division" (number) the division of the pattern, defaults to 1/4
 -- - "enabled" (boolean) is this pattern enabled, defaults to true
 -- @treturn table a new pattern
