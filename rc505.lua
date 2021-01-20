@@ -129,6 +129,7 @@ function redraw()
       beat_total=params:get(i.."beats"),
       beat_current=math.floor(track[i].beat_sync),
       progress=(track[i].beat_sync-1)/params:get(i.."beats"),
+      is_empty=params:get(i.."is_empty")==1,
     })
   end
 

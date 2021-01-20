@@ -32,8 +32,6 @@ function Draw.track(track)
 	Draw.volume_bar(track.i,track.level)
 	if not track.playing then 
 		track.progress = 0 
-	elseif track.playing and track.progress == 0 then 
-		track.progress = 1
 	end
 	-- Draw.circle_with_arc(23+40*(track.i-1),26,12.5,track.progress)
 	Draw.drawing("circle",40*(track.i-1),0,math.floor(100*track.progress)+1)
@@ -42,11 +40,11 @@ function Draw.track(track)
 	end
 	
 	if track.recording then 
-		screen.level(15)
-		screen.circle(24+40*(track.i-1),26,4)
-		screen.fill()
+		Draw.drawing("recording",40*(track.i-1),0)
 	elseif track.playing then 
 		Draw.drawing("playing",40*(track.i-1),0)
+	elseif not track.is_empty then  
+		Draw.drawing("stopped",40*(track.i-1),0)
 	end
 	if track.beat_repeat then 
 		Draw.drawing("beat_repeat",40*(track.i-1),0)
