@@ -15,9 +15,12 @@ update_ui = false
 
 -- constants
 track_buffer = {
-  {buffer=1,start=5},
+  {buffer=1,start=10},
   {buffer=1,start=130},
-  {buffer=2,start=5},
+  {buffer=2,start=10},
+  {buffer=1,start=1},
+  {buffer=1,start=120},
+  {buffer=2,start=1},
 }
 divisions_available = {"1/64","1/32","1/16","1/8","1/4","1/2","1"}
 
@@ -34,6 +37,7 @@ function init()
     track[i].division_effect = 1/16
     track[i].arm_start_rec = false 
     track[i].arm_start_play = false 
+    track[i].arm_start_effect = false
     track[i].arm_stop_rec = false 
     track[i].arm_stop_play = false 
   end
@@ -150,6 +154,13 @@ function clock_tick(division,t,clock_i)
         track[i].beat_effect = track[i].beat_effect + 4*track[i].division_effect
         if track[i].beat_effect > params:get(i.."beats")+0.99 and params:get(i.."beats") > 0 then 
           track[i].beat_effect = 1 
+        end
+        if track[i].arm_start_effect then 
+          track[i].arm_start_effect = false
+          softcut.level_cut_cut(i+3,i,1)
+          softcut.position(i+3,track_buffer[i+3].start)
+          softcut.level(i,0)
+          softcut.level(i+3,params:get(i.."level"))
         end
       end
     end
@@ -281,21 +292,20 @@ function setup_parameters()
     params:add{type='binary',name="effect",id=i..'effect',behavior='toggle',
       action=function(value)
         print(i.."effect: "..value)
-        -- TODO toggle effect
-        softcut.level(i,(1-value)*params:get(i.."level"))
-        softcut.level(i+3,value*params:get(i.."level"))
-        -- feedback effect voice into main voice
-        softcut.level_cut_cut(i+3,i,value)
-        -- softcut.pre_level(i,params:get(i.."pre rec"))
         if value==1 then 
+          -- prep for the effect
+          -- copy the buffer over
           print(track[i].beat_effect)
           local start = track_buffer[i].start+track[i].beat_effect*clock.get_beat_sec()
-          softcut.loop_start(i+3,start)
-          softcut.loop_end(i+3,start+track[i].division_effect*4*clock.get_beat_sec())
-          softcut.position(i+3,start)
-          -- if params:get(i.."recording")==1 then 
-          --   softcut.pre_level(i,0)
-          -- end
+          local length = track[i].division_effect*4*clock.get_beat_sec()
+          softcut.buffer_copy_mono(track_buffer[i].buffer,track_buffer[i].buffer,start,track_buffer[i+3].start,length,0,0)
+          softcut.loop_start(i+3,track_buffer[i+3].start)
+          softcut.loop_end(i+3,track_buffer[i+3].start+length)
+          track[i].arm_start_effect = true -- start it on the beat
+        else
+          softcut.level(i,(1-value)*params:get(i.."level"))
+          softcut.level(i+3,value*params:get(i.."level"))
+          softcut.level_cut_cut(i+3,i,value)
         end
       end
     }
@@ -320,20 +330,19 @@ function reset_softcut()
     -- these are the same for main and feedback loop
     for i=j,j+3,3 do 
       softcut.enable(i,1)
-      softcut.buffer(i,track_buffer[j].buffer)
+      softcut.buffer(i,track_buffer[i].buffer)
       softcut.level(i,params:get(j.."level"))
       softcut.rate(i,params:get(j.."rate"))
       softcut.pan(i,params:get(j.."pan"))
       softcut.play(i,0)
-      softcut.loop_start(i,track_buffer[j].start)
-      softcut.loop_end(i,track_buffer[j].start+120)
+      softcut.loop_start(i,track_buffer[i].start)
       softcut.loop(i,1)
       softcut.level_slew_time(i,0.01)
       softcut.rate_slew_time(i,0.4)
       softcut.pan_slew_time(i,0.4)
       softcut.recpre_slew_time(i,0.4)
       softcut.rec_level(i,0.0)
-      softcut.position(i,track_buffer[j].start)
+      softcut.position(i,track_buffer[i].start)
       softcut.phase_quant(i,0.025)
       softcut.post_filter_dry(i,0.0)
       softcut.post_filter_lp(i,1.0)
@@ -344,6 +353,9 @@ function reset_softcut()
       softcut.pre_filter_rq(i,1.0)
       softcut.pre_filter_fc(i,20100)    
     end
+
+    softcut.loop_end(j,track_buffer[j].start+120)
+    softcut.loop_end(j+3,track_buffer[j+3].start+9)
 
     softcut.play(j+3,1)
     softcut.level(j+3,0)
