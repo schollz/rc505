@@ -25,17 +25,23 @@ end
 function Draw.track(track)
 	-- i, selected
 	screen.move(23+40*(track.i-1),8)
-	screen.text_center("FREE")
+	if track.beat_total > 0 then 
+		screen.text_center(track.beat_current.."/"..track.beat_total)
+	else
+		screen.text_center("FREE")
+	end
 	screen.move(19+40*(track.i-1),59)
-	screen.text("1/8.")
-	Draw.volume_bar(track.i,0.5)
+	screen.text(track.division)
+	Draw.volume_bar(track.i,track.level)
 	Draw.circle_with_arc(23+40*(track.i-1),26,12.5,0.25)
 	if track.selected then 
 		Draw.drawing("selected",40*(track.i-1),0)
 	end
 	
 	if track.recording then 
-		Draw.drawing("recording",40*(track.i-1),0)
+		screen.level(15)
+		screen.circle(24+40*(track.i-1),26,4)
+		screen.fill()
 	elseif track.playing then 
 		Draw.drawing("playing",40*(track.i-1),0)
 	end

@@ -4,10 +4,13 @@
 local Formatters=require 'formatters'
 draw = include("rc505/lib/draw")
 lattice = include("rc505/lib/lattice")
+utils = include("rc505/lib/utils")
 
 -- state 
 tracks = {}
 clocks = {}
+ti = 1 -- track selected
+shifted = false -- shift activated
 
 -- constants
 track_buffer = {
@@ -15,10 +18,13 @@ track_buffer = {
   {buffer=1,start=130},
   {buffer=2,start=5},
 }
-divisions_available = {1/64,1/32,1/16,1/8,1/4,1/2,1}
+divisions_available = {"1/64","1/32","1/16","1/8","1/4","1/2","1"}
 
 
 function init()
+  -- turn down sensitivity
+  norns.enc.sens(1,4)
+
   for i=1,3 do 
     tracks[i] = {}
     tracks[i].beat = 1 
@@ -54,12 +60,20 @@ function refresh()
 end
 
 function key(k,z)
-
+  if k==1 then 
+    shifted = z==1
+  end
 end
 
 
 function enc(k,d)
-
+  if k==1 then 
+    ti = utils.sign_cycle(ti,d,1,3)
+  elseif k==2 then 
+    params:delta(ti.."level",d)
+  elseif k==3 then 
+    params:delta(ti.."effect division",d)
+  end
 end
 
 function redraw()
@@ -69,11 +83,15 @@ function redraw()
   for i=1,3 do 
     Draw.track({
       i=i,
-      selected=i==1,--params:get(i.."selected")==1,
-      playing=true,--params:get(i.."playing")==1,
+      selected=ti==i,
+      level=params:get(i.."level"),
+      playing=params:get(i.."playing")==1,
       recording=params:get(i.."recording")==1,
-      beat_repeat=true,--params:get(i.."effect type")==1,
+      beat_repeat=params:get(i.."effect type")==1,
       beat_shuffle=params:get(i.."effect type")==2,
+      division=divisions_available[params:get(i.."effect division")],
+      beat_total=params:get(i.."beats"),
+      beat_current=tracks[i].beat,
     })
   end
 
@@ -113,7 +131,7 @@ function setup_parameters()
   -- parameters for softcut loops
   params:add_separator("tracks")
   for i=1,3 do
-    params:add_group("track "..i,10)
+    params:add_group("track "..i,11)
     params:add {type="control",id=i.."level",name="level",controlspec=controlspec.new(0,1.0,'lin',0.01,0.5,''),
       action=function(value)
         print(i.."level: "..value)
@@ -146,7 +164,7 @@ function setup_parameters()
       end
     }
     params:add_option(i.."effect type","effect type",{"repeat","shuffle"},1)
-    params:add_option(i.."effect division","effect division",divisions_available,1)
+    params:add_option(i.."effect division","effect division",divisions_available,3)
     params:set_action(i.."effect division",function(value)
       print(i.."effect division: "..divisions_available[value])
       -- enable this division on the clocks
@@ -163,19 +181,6 @@ function setup_parameters()
         softcut.post_filter_fc(i+3,value)
       end
     }
-    params:add{type='binary',name="selected",id=i..'selected',behavior='toggle',
-      action=function(value)
-        if value == 1 then 
-          print(i.."selected: "..value)
-          for j=1,3 do 
-            if i~=j then 
-              params:set(j.."selected",0)
-            end
-          end
-        end
-      end
-    }
-    params:hide(i.."selected")
     params:add{type='binary',name="playing",id=i..'playing',behavior='toggle',
       action=function(value)
         print(i.."playing: "..value)
