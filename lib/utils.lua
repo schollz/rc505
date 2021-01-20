@@ -1,6 +1,11 @@
 utils = {}
 
 
+function utils.tonumber(s)
+  local fs = load("local a = "..s.."; return a")
+  return fs()
+end
+
 function utils.sign(value)
   if value>0 then
     return 1

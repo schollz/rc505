@@ -7,10 +7,11 @@ lattice = include("rc505/lib/lattice")
 utils = include("rc505/lib/utils")
 
 -- state 
-tracks = {}
-clocks = {}
+track = {}
+clk = {}
 ti = 1 -- track selected
 shifted = false -- shift activated
+update_ui = false
 
 -- constants
 track_buffer = {
@@ -26,42 +27,70 @@ function init()
   norns.enc.sens(1,4)
 
   for i=1,3 do 
-    tracks[i] = {}
-    tracks[i].beat = 1 
-    tracks[i].division = 1/4
+    track[i] = {}
+    track[i].beat = 1 
+    track[i].division_sync = 1/16
+    track[i].division_effect = 1/16
+    track[i].arm_start_rec = false 
+    track[i].arm_start_play = false 
+    track[i].arm_stop_rec = false 
+    track[i].arm_stop_play = false 
   end
 
   -- setup clocks for the divisions
   lattice_timing = lattice:new()
   for i,division in ipairs(divisions_available) do 
-    clocks[i] = lattice_timing:new_pattern{
+    division = utils.tonumber(division)
+    print("clock on "..division)
+    clk[i] = lattice_timing:new_pattern{
       action = function(t)
         clock_tick(division,t,i)
       end,
-      enabled = division==1/4 -- only enable quarter-note, fx enable others
+      division=division,
+      enabled = true,
     }
   end
+  lattice_timing:start()
 
 
   -- initialize refresh timer
   timer=metro.init()
-  timer.time=0.05
+  timer.time=clock.get_beat_sec()/4
   timer.count=-1
   timer.event=refresh
   timer:start()
 
   -- setup parameters
   setup_parameters()
+
+  --setup softcut
+  reset_softcut()
 end
 
 function refresh()
-
   redraw()
 end
 
 function key(k,z)
   if k==1 then 
     shifted = z==1
+  elseif k==2 and z==1 and shifted then 
+    params:set(ti.."playing",0)
+  elseif k==2 and z==1 then 
+    if params:get(ti.."is_empty") == 1 then 
+      print(ti.." arming to play and record")
+      track[ti].arm_start_play = true 
+      track[ti].arm_start_rec = true 
+    elseif params:get(ti.."recording") == 1 then 
+      print(ti.." arming to stop rec and play")
+      track[ti].arm_stop_rec = true
+    elseif params:get(ti.."playing") == 1 then 
+      print(ti.." arming to rec")
+      track[ti].arm_start_rec = true
+    elseif params:get(ti.."playing") == 0 then 
+      print(ti.." arming to play")
+      track[ti].arm_start_play = true
+    end
   end
 end
 
@@ -91,7 +120,8 @@ function redraw()
       beat_shuffle=params:get(i.."effect type")==2,
       division=divisions_available[params:get(i.."effect division")],
       beat_total=params:get(i.."beats"),
-      beat_current=tracks[i].beat,
+      beat_current=math.floor(track[i].beat),
+      progress=(track[i].beat-1)/params:get(i.."beats"),
     })
   end
 
@@ -99,20 +129,36 @@ function redraw()
 end
 
 function clock_tick(division,t,clock_i)
-  if division==1/4 then 
-    for i=1,3 do 
-      if params:get(i.."playing")==1 then 
-        -- update all the track beat numbers
-        track[i].beat = track[i].beat + 1 
-        if track[i].beat > params:get(i.."beats") and params:get(i.."beats") > 0 then 
+  for i=1,3 do 
+    -- update clock
+    if params:get(i.."playing")==1 then 
+      if division==1/16 then 
+        track[i].beat = track[i].beat + 0.25
+        if track[i].beat > params:get(i.."beats")+0.99 and params:get(i.."beats") > 0 then 
           -- reset any tracks that need reset
           track[i].beat = 1 
           softcut.position(i,track_buffer[i].start)
+          -- if params:get(i.."recording") == 1 then 
+          --   params:set(i.."recording",0)
+          -- end
         end
       end
     end
-    -- TODO update the screen
+    -- check whether anything is armed
+    if division == track[i].division_sync and track[i].arm_start_play then
+      params:set(i.."playing",1)
+    end
+    if division == track[i].division_sync and track[i].arm_start_rec then 
+      params:set(i.."recording",1)
+    end
+    if division == track[i].division_sync and track[i].arm_stop_play then 
+      params:set(i.."playing",0)
+    end
+    if division == track[i].division_sync and track[i].arm_stop_rec then 
+      params:set(i.."recording",0)
+    end
   end
+
   -- if division equals track division and is beat repeating, do something
   -- -- TODO: disable division if there are not tracks needing it anymore
   -- for i=1,3 do 
@@ -121,7 +167,7 @@ function clock_tick(division,t,clock_i)
   --     has_division = true
   --   end
   --   if not has_division and division ~= 1/4 then 
-  --     clocks[clock_i]:stop()
+  --     clk[clock_i]:stop()
   --   end
   -- end
 end
@@ -132,6 +178,13 @@ function setup_parameters()
   params:add_separator("tracks")
   for i=1,3 do
     params:add_group("track "..i,11)
+    params:add_option(i.."sync division","effect division",divisions_available,3)
+    params:set_action(i.."sync division",function(value)
+      print(i.."sync division: "..divisions_available[value])
+      -- enable this division on the clocks
+      clk[i]:start()
+      track[i].division_sync_sync = utils.tonumber(divisions_available[value])
+    end)
     params:add {type="control",id=i.."level",name="level",controlspec=controlspec.new(0,1.0,'lin',0.01,0.5,''),
       action=function(value)
         print(i.."level: "..value)
@@ -168,7 +221,7 @@ function setup_parameters()
     params:set_action(i.."effect division",function(value)
       print(i.."effect division: "..divisions_available[value])
       -- enable this division on the clocks
-      clocks[i]:start()
+      clk[i]:start()
     end)
     params:add {type="control",id=i.."pre",name="pre rec",controlspec=controlspec.new(0,1.0,'lin',0.01,1.0,''),
       action=function(value)
@@ -184,22 +237,36 @@ function setup_parameters()
     params:add{type='binary',name="playing",id=i..'playing',behavior='toggle',
       action=function(value)
         print(i.."playing: "..value)
-        -- TODO: start playing on the beat if synced
+        if track[i].arm_stop_play then
+          track[i].arm_stop_play = false 
+        end
+        if track[i].arm_start_play then
+          track[i].arm_start_play = false 
+        end
         softcut.play(i,value)
-        if value==1 then 
-          track[i].beat = 1
-          softcut.position(i,track_buffer[i].start)
+        track[i].beat = 1
+        softcut.position(i,track_buffer[i].start)
+        if value == 0 then 
+          params:set(i.."recording",0)
         end
       end
     }
     params:add{type='binary',name="recording",id=i..'recording',behavior='toggle',
       action=function(value)
-        print(i.."record: "..value)
+        print(i.."recording: "..value)
+        if track[i].arm_stop_rec then
+          track[i].arm_stop_rec = false 
+        end
+        if track[i].arm_start_rec then
+          track[i].arm_start_rec = false 
+        end
         softcut.rec_level(i,value)
         if value == 0 then 
           -- set the loop end? 
           -- TODO: is this supposed to be on the beat?
           -- question: if its free, is the new loop from when you started and when you stopped the recording?
+        else 
+          params:set(i.."is_empty",0)
         end
       end
     }
@@ -209,6 +276,13 @@ function setup_parameters()
         -- TODO toggle effect
       end
     }
+    params:add{type='binary',name="is_empty",id=i..'is_empty',behavior='toggle',
+      action=function(value)
+        print(i.."is_empty: "..value)
+      end
+    }
+    params:hide(i.."is_empty")
+    params:set(i.."is_empty",1)
   end
 end
 
@@ -227,7 +301,7 @@ function reset_softcut()
       softcut.level(i,params:get(j.."level"))
       softcut.rate(i,params:get(j.."rate"))
       softcut.pan(i,params:get(j.."pan"))
-      softcut.play(i,1)
+      softcut.play(i,0)
       softcut.loop_start(i,track_buffer[j].start)
       softcut.loop_end(i,track_buffer[j].start+120)
       softcut.loop(i,1)
@@ -258,7 +332,9 @@ function reset_softcut()
     softcut.rec(j+3,0)
 
     -- only main loop sets pre record feedback?
-    softcut.pre_level(j,params:get(i.."pre"))
+    softcut.pre_level(j,params:get(j.."pre"))
     softcut.pre_level(j+3,1.0)  
   end
+  softcut.poll_start_phase()
+  audio.level_adc_cut(1)
 end

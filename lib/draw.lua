@@ -21,7 +21,6 @@ function Draw.drawing(name,x,y)
 end
 
 
-
 function Draw.track(track)
 	-- i, selected
 	screen.move(23+40*(track.i-1),8)
@@ -33,7 +32,12 @@ function Draw.track(track)
 	screen.move(19+40*(track.i-1),59)
 	screen.text(track.division)
 	Draw.volume_bar(track.i,track.level)
-	Draw.circle_with_arc(23+40*(track.i-1),26,12.5,0.25)
+	if not track.playing then 
+		track.progress = 0 
+	elseif track.plaing and track.progress == 0 then 
+		track.progress = 1
+	end
+	Draw.circle_with_arc(23+40*(track.i-1),26,12.5,track.progress)
 	if track.selected then 
 		Draw.drawing("selected",40*(track.i-1),0)
 	end
