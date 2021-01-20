@@ -28,7 +28,8 @@ function init()
 
   for i=1,3 do 
     track[i] = {}
-    track[i].beat = 1 
+    track[i].beat_sync = 1 
+    track[i].beat_effect = 1
     track[i].division_sync = 1/16
     track[i].division_effect = 1/16
     track[i].arm_start_rec = false 
@@ -91,6 +92,8 @@ function key(k,z)
       print(ti.." arming to play")
       track[ti].arm_start_play = true
     end
+  elseif k==3 then 
+    params:set(ti.."effect",z)
   end
 end
 
@@ -120,8 +123,8 @@ function redraw()
       beat_shuffle=params:get(i.."effect type")==2,
       division=divisions_available[params:get(i.."effect division")],
       beat_total=params:get(i.."beats"),
-      beat_current=math.floor(track[i].beat),
-      progress=(track[i].beat-1)/params:get(i.."beats"),
+      beat_current=math.floor(track[i].beat_sync),
+      progress=(track[i].beat_sync-1)/params:get(i.."beats"),
     })
   end
 
@@ -132,15 +135,21 @@ function clock_tick(division,t,clock_i)
   for i=1,3 do 
     -- update clock
     if params:get(i.."playing")==1 then 
-      if division==1/16 then 
-        track[i].beat = track[i].beat + 0.25
-        if track[i].beat > params:get(i.."beats")+0.99 and params:get(i.."beats") > 0 then 
+      if division==track[i].division_sync then 
+        track[i].beat_sync = track[i].beat_sync + 4*track[i].division_sync
+        if track[i].beat_sync > params:get(i.."beats")+0.99 and params:get(i.."beats") > 0 then 
           -- reset any tracks that need reset
-          track[i].beat = 1 
+          track[i].beat_sync = 1 
           softcut.position(i,track_buffer[i].start)
           -- if params:get(i.."recording") == 1 then 
           --   params:set(i.."recording",0)
           -- end
+        end
+      end
+      if division==track[i].division_effect then 
+        track[i].beat_effect = track[i].beat_effect + 4*track[i].division_effect
+        if track[i].beat_effect > params:get(i.."beats")+0.99 and params:get(i.."beats") > 0 then 
+          track[i].beat_effect = 1 
         end
       end
     end
@@ -177,13 +186,11 @@ function setup_parameters()
   -- parameters for softcut loops
   params:add_separator("tracks")
   for i=1,3 do
-    params:add_group("track "..i,11)
+    params:add_group("track "..i,12)
     params:add_option(i.."sync division","effect division",divisions_available,3)
     params:set_action(i.."sync division",function(value)
       print(i.."sync division: "..divisions_available[value])
-      -- enable this division on the clocks
-      clk[i]:start()
-      track[i].division_sync_sync = utils.tonumber(divisions_available[value])
+      track[i].division_sync = utils.tonumber(divisions_available[value])
     end)
     params:add {type="control",id=i.."level",name="level",controlspec=controlspec.new(0,1.0,'lin',0.01,0.5,''),
       action=function(value)
@@ -220,10 +227,9 @@ function setup_parameters()
     params:add_option(i.."effect division","effect division",divisions_available,3)
     params:set_action(i.."effect division",function(value)
       print(i.."effect division: "..divisions_available[value])
-      -- enable this division on the clocks
-      clk[i]:start()
+      track[i].division_effect = utils.tonumber(divisions_available[value])
     end)
-    params:add {type="control",id=i.."pre",name="pre rec",controlspec=controlspec.new(0,1.0,'lin',0.01,1.0,''),
+    params:add {type="control",id=i.."pre rec",name="pre rec",controlspec=controlspec.new(0,1.0,'lin',0.01,1.0,''),
       action=function(value)
         softcut.pre_level(i,value)
       end
@@ -244,7 +250,8 @@ function setup_parameters()
           track[i].arm_start_play = false 
         end
         softcut.play(i,value)
-        track[i].beat = 1
+        track[i].beat_sync = 1
+        track[i].beat_effect = 1
         softcut.position(i,track_buffer[i].start)
         if value == 0 then 
           params:set(i.."recording",0)
@@ -260,6 +267,7 @@ function setup_parameters()
         if track[i].arm_start_rec then
           track[i].arm_start_rec = false 
         end
+        softcut.rec(i,value)
         softcut.rec_level(i,value)
         if value == 0 then 
           -- set the loop end? 
@@ -274,6 +282,21 @@ function setup_parameters()
       action=function(value)
         print(i.."effect: "..value)
         -- TODO toggle effect
+        softcut.level(i,(1-value)*params:get(i.."level"))
+        softcut.level(i+3,value*params:get(i.."level"))
+        -- feedback effect voice into main voice
+        softcut.level_cut_cut(i+3,i,value)
+        -- softcut.pre_level(i,params:get(i.."pre rec"))
+        if value==1 then 
+          print(track[i].beat_effect)
+          local start = track_buffer[i].start+track[i].beat_effect*clock.get_beat_sec()
+          softcut.loop_start(i+3,start)
+          softcut.loop_end(i+3,start+track[i].division_effect*4*clock.get_beat_sec())
+          softcut.position(i+3,start)
+          -- if params:get(i.."recording")==1 then 
+          --   softcut.pre_level(i,0)
+          -- end
+        end
       end
     }
     params:add{type='binary',name="is_empty",id=i..'is_empty',behavior='toggle',
@@ -305,8 +328,10 @@ function reset_softcut()
       softcut.loop_start(i,track_buffer[j].start)
       softcut.loop_end(i,track_buffer[j].start+120)
       softcut.loop(i,1)
-      softcut.level_slew_time(i,0.4)
+      softcut.level_slew_time(i,0.01)
       softcut.rate_slew_time(i,0.4)
+      softcut.pan_slew_time(i,0.4)
+      softcut.recpre_slew_time(i,0.4)
       softcut.rec_level(i,0.0)
       softcut.position(i,track_buffer[j].start)
       softcut.phase_quant(i,0.025)
@@ -320,12 +345,16 @@ function reset_softcut()
       softcut.pre_filter_fc(i,20100)    
     end
 
+    softcut.play(j+3,1)
+    softcut.level(j+3,0)
+
     -- main loop listens to input
     softcut.level_input_cut(1,j,1)
     softcut.level_input_cut(2,j,1)
     -- no input into feedback loop
     softcut.level_input_cut(1,j+3,0)
     softcut.level_input_cut(2,j+3,0)
+
 
     -- only main loop records
     softcut.rec(j,1)
