@@ -22,6 +22,7 @@ function Draw.track(track)
 	if track.selected then 
 		Draw.drawing("selected",23+40*(track.i-1),26)
 	end
+	
 	if track.recording then 
 		Draw.drawing("recording",12+40*(track.i-1),56)
 	elseif track.playing then 
