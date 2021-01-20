@@ -22,7 +22,7 @@ func main() {
 }
 
 func pixelToLua(fname string) (data string) {
-	luaName := strings.TrimPrefix(strings.TrimSuffix(fname, ".png"), `elements\`)
+	luaName := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSuffix(fname, ".png"), `elements\`), "elements/")
 	f, err := os.Open(fname)
 	if err != nil {
 		panic(err)
@@ -32,24 +32,6 @@ func pixelToLua(fname string) (data string) {
 		panic(err)
 	}
 
-	// first center point
-	xCenter := 0.0
-	yCenter := 0.0
-	points := 0.0
-	for x := img.Bounds().Min.X; x <= img.Bounds().Max.X; x++ {
-		for y := img.Bounds().Min.Y; y <= img.Bounds().Max.Y; y++ {
-			c := img.At(x, y)
-			a, _, _, d := c.RGBA()
-			if d == 65535 && a > 0 {
-				xCenter = xCenter + float64(x)
-				yCenter = yCenter + float64(y)
-				points += 1
-			}
-		}
-	}
-	xCenter = math.Round(xCenter / points)
-	yCenter = math.Round(yCenter / points)
-	// fmt.Println(xCenter, yCenter)
 	data = fmt.Sprintf("%s = {", luaName)
 	for x := img.Bounds().Min.X; x <= img.Bounds().Max.X; x++ {
 		for y := img.Bounds().Min.Y; y <= img.Bounds().Max.Y; y++ {
@@ -63,7 +45,7 @@ func pixelToLua(fname string) (data string) {
 					val = 1
 				}
 				// fmt.Println(val)
-				data += fmt.Sprintf("{%d,%d,%d},", x-int(xCenter), y-int(xCenter), int(val))
+				data += fmt.Sprintf("{%d,%d,%d},", x, y, int(val))
 			}
 		}
 	}

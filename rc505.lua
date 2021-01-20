@@ -20,6 +20,7 @@ divisions_available = {1/64,1/32,1/16,1/8,1/4,1/2,1}
 
 function init()
   for i=1,3 do 
+    tracks[i] = {}
     tracks[i].beat = 1 
     tracks[i].division = 1/4
   end
@@ -36,13 +37,15 @@ function init()
   end
 
 
- -- initialize refresh timer
+  -- initialize refresh timer
   timer=metro.init()
   timer.time=0.05
   timer.count=-1
   timer.event=refresh
   timer:start()
 
+  -- setup parameters
+  setup_parameters()
 end
 
 function refresh()
@@ -66,10 +69,10 @@ function redraw()
   for i=1,3 do 
     Draw.track({
       i=i,
-      selected=params:get(i.."selected")==1,
-      playing=params:get(i.."playing")==1,
+      selected=i==1,--params:get(i.."selected")==1,
+      playing=true,--params:get(i.."playing")==1,
       recording=params:get(i.."recording")==1,
-      beat_repeat=params:get(i.."effect type")==1,
+      beat_repeat=true,--params:get(i.."effect type")==1,
       beat_shuffle=params:get(i.."effect type")==2,
     })
   end
@@ -126,7 +129,7 @@ function setup_parameters()
       end
     }
     params:add {type="control",id=i.."rate",name="rate",controlspec=controlspec.new(-2,2.0,'lin',0.01,1.0,''),
-      action=function(value)j
+      action=function(value)
         print(i.."rate: "..value)
         softcut.rate(i,value)
         softcut.rate(i+3,value)
