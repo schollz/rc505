@@ -17,7 +17,7 @@ function Lattice:new(args)
   local args = args == nil and {} or args
   l.auto = args.auto == nil and true or args.auto
   l.meter = args.meter == nil and 4 or args.meter
-  l.ppqn = args.ppqn == nil and 96 or args.ppqn
+  l.ppqn = args.ppqn == nil and 16 or args.ppqn
   l.enabled = false
   l.transport = 0
   l.superclock_id = nil

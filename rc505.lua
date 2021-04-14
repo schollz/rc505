@@ -24,6 +24,7 @@ track_buffer = {
   {buffer=2,start=1},
 }
 divisions_available = {"1/64","1/32","1/16","1/8","1/4","1/2","1"}
+divisions_available = {"1/16","1/8","1/4"}
 
 
 function init()
@@ -139,6 +140,9 @@ end
 
 function clock_tick(division,t,clock_i)
   for i=1,3 do 
+    if i==1 and division==1/4 then 
+      print(division,"qn",t)
+    end
     -- update clock
     if params:get(i.."playing")==1 then 
       if division==track[i].division_sync then 
@@ -171,6 +175,7 @@ function clock_tick(division,t,clock_i)
       params:set(i.."playing",1)
     end
     if division == track[i].division_sync and track[i].arm_start_rec then 
+      print(division,track[i].division_sync,"recording",i)
       params:set(i.."recording",1)
     end
     if division == track[i].division_sync and track[i].arm_stop_play then 
@@ -319,6 +324,7 @@ function setup_parameters()
     params:hide(i.."is_empty")
     params:set(i.."is_empty",1)
   end
+  params:bang()
 end
 
 
@@ -385,6 +391,7 @@ end
 
 function clock.transport.start()
   if lattice_timing ~= nil then
+    print("hard_sync")
     lattice_timing:hard_sync()
   end
 end
